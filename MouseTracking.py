@@ -15,18 +15,18 @@ motionPath = []
 
 
 def initCapture():
-    histExists = False
+    calibrated = False
     mouseAction = True
     window = cv2.VideoCapture(0)
 
-    while window.isOpened():
+    while True:
 
         frame = cv2.flip(window.read()[1], 1)
         keyPressed = cv2.waitKey(1)
 
         if keyPressed == ord("c"):
             hist = getHist(frame)
-            histExists = True
+            calibrated = True
         elif keyPressed == ord("m"):
             mouseAction = True
         elif keyPressed == ord("s"):
@@ -36,22 +36,27 @@ def initCapture():
             cv2.destroyAllWindows()
             break
 
-        if histExists:
-            coordinates = getCoordinates(frame, hist)
-            execAction(coordinates, frame.shape, mouseAction)
+        if calibrated:
+            run(mouseAction, hist, frame)
 
         else:
             drawSamplingRect(frame)
 
-        cv2.imshow("Output", frame)
+        cv2.imshow("Window", frame)
 
 
-def getCoordinates(frame, hist):
+def run(action, hist, frame):
     histMask = getHistMask(frame, hist)
-    cv2.imshow("histMask", histMask)
+    cv2.imshow("Mask", histMask)
+    coordinates = getCoordinates(histMask)
+    if coordinates is not None:
+        execAction(coordinates, frame.shape, action)
+
+
+def getCoordinates(histMask):
     largestCnt = getLargestCnt(histMask)
     if largestCnt is None:
-        return
+        return None
 
     coordinates = largestCnt[largestCnt[:, :, 1].argmin()][0]
     return reduceNoise(coordinates)
@@ -59,8 +64,6 @@ def getCoordinates(frame, hist):
 
 def execAction(coordinates, shape, mouseAction):
     if mouseAction:
-        if coordinates is None:
-            return
         col, row = coordinates[0], coordinates[1]
         pyautogui.moveTo(col * screenCols / shape[1], row * screenRows / shape[0])
     else:
@@ -75,9 +78,9 @@ def drawSamplingRect(frame):
     cv2.rectangle(frame, (icol, irow), (icol + COLS_LEN, irow + ROWS_LEN), (0, L - 1, 0), 1)
 
 
-def getLargestCnt(histMask):
-    grayHistMask = cv2.cvtColor(histMask, cv2.COLOR_BGR2GRAY)
-    thresh = cv2.threshold(grayHistMask, 0, L - 1, 0)[1]
+def getLargestCnt(mask):
+    gray_Mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.threshold(gray_Mask, 0, L - 1, 0)[1]
     contours = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
     if len(contours) == 0:
         return None
