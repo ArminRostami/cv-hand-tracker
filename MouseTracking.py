@@ -13,7 +13,7 @@ histExists = False
 screenCols, screenRows = pyautogui.size()
 pyautogui.PAUSE = 0
 pyautogui.FAILSAFE = False
-traversePoints = []
+motionPath = []
 
 
 def getHist(frame):
@@ -40,40 +40,38 @@ def drawSamplingRect(frame):
 def detect(frame, hist):
     histMask = getHistMask(frame, hist)
     cv2.imshow("histMask", histMask)
-    largestContour = getLargestContour(histMask)
-    if largestContour is None:
+    largestCnt = getLargestCnt(histMask)
+    if largestCnt is None:
         return
 
-    farthestPoint = largestContour[largestContour[:, :, 1].argmin()][0]
-    farthestPoint = reduceNoise(farthestPoint)
+    coordinates = largestCnt[largestCnt[:, :, 1].argmin()][0]
+    coordinates = reduceNoise(coordinates)
 
-    execute(farthestPoint, frame)
+    execute(coordinates, frame.shape)
 
 
-def reduceNoise(farthestPoint):
-    if len(traversePoints) > 0:
-        if abs(farthestPoint[0] - traversePoints[-1][0]) < 10:
-            farthestPoint[0] = traversePoints[-1][0]
-        if abs(farthestPoint[1] - traversePoints[-1][1]) < 10:
-            farthestPoint[1] = traversePoints[-1][1]
-    if len(traversePoints) < 10:
-        traversePoints.append(farthestPoint)
+def reduceNoise(coordinates):
+    if len(motionPath) > 0:
+        if abs(coordinates[0] - motionPath[-1][0]) < 10:
+            coordinates[0] = motionPath[-1][0]
+        if abs(coordinates[1] - motionPath[-1][1]) < 10:
+            coordinates[1] = motionPath[-1][1]
+    if len(motionPath) < 10:
+        motionPath.append(coordinates)
     else:
-        traversePoints.pop(0)
-        traversePoints.append(farthestPoint)
-    return farthestPoint
+        motionPath.pop(0)
+        motionPath.append(coordinates)
+    return coordinates
 
 
-def execute(farthestPoint, frame):
+def execute(coordinates, shape):
     if mouseMode:
-        targetX = farthestPoint[0]
-        targetY = farthestPoint[1]
-        pyautogui.moveTo(
-            targetX * screenCols / frame.shape[1], targetY * screenRows / frame.shape[0]
-        )
+        targetX = coordinates[0]
+        targetY = coordinates[1]
+        pyautogui.moveTo(targetX * screenCols / shape[1], targetY * screenRows / shape[0])
     else:
-        if len(traversePoints) >= 2:
-            movedDistance = traversePoints[-1][1] - traversePoints[-2][1]
+        if len(motionPath) >= 2:
+            movedDistance = motionPath[-1][1] - motionPath[-2][1]
             pyautogui.scroll(-movedDistance / 2)
 
 
@@ -93,7 +91,7 @@ def getHistMask(frame, hist):
     return cv2.bitwise_and(frame, merged)
 
 
-def getLargestContour(histMask):
+def getLargestCnt(histMask):
     grayHistMask = cv2.cvtColor(histMask, cv2.COLOR_BGR2GRAY)
     thresh = cv2.threshold(grayHistMask, 0, L - 1, 0)[1]
     contours = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
