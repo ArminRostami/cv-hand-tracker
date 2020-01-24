@@ -8,8 +8,6 @@ ROWS_LEN = 20
 COLS_LEN = 20
 ROW_START = 0.5
 COL_START = 0.8
-mouseMode = True
-histExists = False
 screenCols, screenRows = pyautogui.size()
 pyautogui.PAUSE = 0
 pyautogui.FAILSAFE = False
@@ -17,8 +15,6 @@ motionPath = []
 
 
 def getHist(frame):
-    global histExists
-    histExists = True
     rows, cols = frame.shape[0], frame.shape[1]
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     roi = np.zeros([ROWS_LEN, COLS_LEN, 3], dtype=hsv.dtype)
@@ -37,7 +33,7 @@ def drawSamplingRect(frame):
     cv2.rectangle(frame, (icol, irow), (icol + COLS_LEN, irow + ROWS_LEN), (0, L - 1, 0), 1)
 
 
-def detect(frame, hist):
+def getCoordinates(frame, hist):
     histMask = getHistMask(frame, hist)
     cv2.imshow("histMask", histMask)
     largestCnt = getLargestCnt(histMask)
@@ -45,16 +41,15 @@ def detect(frame, hist):
         return
 
     coordinates = largestCnt[largestCnt[:, :, 1].argmin()][0]
-    coordinates = reduceNoise(coordinates)
-
-    execute(coordinates, frame.shape)
+    return reduceNoise(coordinates)
 
 
 def reduceNoise(coordinates):
+    TOLERANCE = 15
     if len(motionPath) > 0:
-        if abs(coordinates[0] - motionPath[-1][0]) < 10:
+        if abs(coordinates[0] - motionPath[-1][0]) < TOLERANCE:
             coordinates[0] = motionPath[-1][0]
-        if abs(coordinates[1] - motionPath[-1][1]) < 10:
+        if abs(coordinates[1] - motionPath[-1][1]) < TOLERANCE:
             coordinates[1] = motionPath[-1][1]
     if len(motionPath) < 10:
         motionPath.append(coordinates)
@@ -64,15 +59,16 @@ def reduceNoise(coordinates):
     return coordinates
 
 
-def execute(coordinates, shape):
-    if mouseMode:
-        targetX = coordinates[0]
-        targetY = coordinates[1]
-        pyautogui.moveTo(targetX * screenCols / shape[1], targetY * screenRows / shape[0])
+def execAction(coordinates, shape, mouseAction):
+    if mouseAction:
+        if coordinates is None:
+            return
+        col, row = coordinates[0], coordinates[1]
+        pyautogui.moveTo(col * screenCols / shape[1], row * screenRows / shape[0])
     else:
         if len(motionPath) >= 2:
-            movedDistance = motionPath[-1][1] - motionPath[-2][1]
-            pyautogui.scroll(-movedDistance / 2)
+            distance = motionPath[-1][1] - motionPath[-2][1]
+            pyautogui.scroll(-distance / 2)
 
 
 def getHistMask(frame, hist):
@@ -80,7 +76,7 @@ def getHistMask(frame, hist):
     dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, HUE_MAX, 0, L], 1)
 
     disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
-    cv2.filter2D(dst, -1, disc, dst)
+    dst = cv2.filter2D(dst, -1, disc)
 
     thresh = cv2.threshold(dst, 150, L - 1, cv2.THRESH_BINARY)[1]
 
@@ -101,27 +97,31 @@ def getLargestCnt(histMask):
 
 
 def initCapture():
-    global mouseMode, histExists
-    capture = cv2.VideoCapture(0)
+    histExists = False
+    mouseAction = True
+    window = cv2.VideoCapture(0)
 
-    while capture.isOpened():
-        frame = capture.read()[1]
-        frame = cv2.flip(frame, 1)
-        k = cv2.waitKey(1) & 0xFF
+    while window.isOpened():
 
-        if k == ord("c"):
+        frame = cv2.flip(window.read()[1], 1)
+        keyPressed = cv2.waitKey(1)
+
+        if keyPressed == ord("c"):
             hist = getHist(frame)
-        elif k == ord("m"):
-            mouseMode = True
-        elif k == ord("s"):
-            mouseMode = False
-        elif k == ord("q"):
-            capture.release()
+            histExists = True
+        elif keyPressed == ord("m"):
+            mouseAction = True
+        elif keyPressed == ord("s"):
+            mouseAction = False
+        elif keyPressed == ord("q"):
+            window.release()
             cv2.destroyAllWindows()
             break
 
         if histExists:
-            detect(frame, hist)
+            coordinates = getCoordinates(frame, hist)
+            execAction(coordinates, frame.shape, mouseAction)
+
         else:
             drawSamplingRect(frame)
 
