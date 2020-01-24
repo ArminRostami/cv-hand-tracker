@@ -41,8 +41,6 @@ def detect(frame, hist):
     if largestContour is None:
         return
 
-    centroid = getCentroid(largestContour)
-    cv2.circle(frame, centroid, 5, [L - 1, 0, 0], -1)
     farthestPoint = largestContour[largestContour[:, :, 1].argmin()][0]
     if len(traversePoints) > 0:
         if abs(farthestPoint[0] - traversePoints[-1][0]) < 10:
@@ -96,16 +94,6 @@ def getHistMask(frame, hist):
 
     merged = cv2.merge((thresh, thresh, thresh))
     return cv2.bitwise_and(frame, merged)
-
-
-def getCentroid(contour):
-    moment = cv2.moments(contour)
-    if moment["m00"] != 0:
-        cx = int(moment["m10"] / moment["m00"])
-        cy = int(moment["m01"] / moment["m00"])
-        return cx, cy
-    else:
-        return None
 
 
 def getLargestContour(histMask):
