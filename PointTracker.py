@@ -17,18 +17,21 @@ traversePoints = []
 
 
 def getHist(frame):
-    rows, cols, _ = frame.shape
-    hsvFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    roi = np.zeros([ROWS_LEN, COLS_LEN, 3], dtype=hsvFrame.dtype)
+    global histExists
+    histExists = True
+    rows, cols = frame.shape[0], frame.shape[1]
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    roi = np.zeros([ROWS_LEN, COLS_LEN, 3], dtype=hsv.dtype)
 
-    irow, icol = int(ROW_START * rows), int(COL_START * cols)
-    roi = hsvFrame[irow : irow + ROWS_LEN, icol : icol + COLS_LEN, :]
+    irow = int(ROW_START * rows)
+    icol = int(COL_START * cols)
+    roi = hsv[irow : irow + ROWS_LEN, icol : icol + COLS_LEN, :]
 
     hist = cv2.calcHist([roi], [0, 1], None, [HUE_MAX, L], [0, HUE_MAX, 0, L])
     return cv2.normalize(hist, hist, 0, L - 1, cv2.NORM_MINMAX)
 
 
-def drawLocker(frame):
+def drawSamplingRect(frame):
     rows, cols = frame.shape[0], frame.shape[1]
     irow, icol = int(ROW_START * rows), int(COL_START * cols)
     cv2.rectangle(frame, (icol, irow), (icol + COLS_LEN, irow + ROWS_LEN), (0, L - 1, 0), 1)
@@ -87,7 +90,7 @@ def getHistMask(frame, hist):
     disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
     cv2.filter2D(dst, -1, disc, dst)
 
-    ret, thresh = cv2.threshold(dst, 150, L - 1, cv2.THRESH_BINARY)
+    thresh = cv2.threshold(dst, 150, L - 1, cv2.THRESH_BINARY)[1]
 
     kernel = np.ones((5, 5), np.uint8)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=5)
@@ -114,24 +117,23 @@ def initCapture():
         frame = cv2.flip(frame, 1)
         k = cv2.waitKey(1) & 0xFF
 
-        if k == ord("z"):
-            histExists = True
+        if k == ord("c"):
             hist = getHist(frame)
         elif k == ord("m"):
             mouseMode = True
-        elif k == ord("n"):
+        elif k == ord("s"):
             mouseMode = False
         elif k == ord("q"):
+            capture.release()
+            cv2.destroyAllWindows()
             break
+
         if histExists:
             detect(frame, hist)
         else:
-            drawLocker(frame)
+            drawSamplingRect(frame)
 
         cv2.imshow("Output", frame)
-
-    capture.release()
-    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
