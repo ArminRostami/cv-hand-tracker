@@ -8,13 +8,12 @@ ROWS_LEN = 20
 COLS_LEN = 20
 ROW_START = 0.5
 COL_START = 0.8
-screenCols, screenRows = pyautogui.size()
-pyautogui.PAUSE = 0
-pyautogui.FAILSAFE = False
 motionPath = []
 
 
-def initCapture():
+def main():
+    pyautogui.PAUSE = 0
+    pyautogui.FAILSAFE = False
     calibrated = False
     mouseAction = True
     window = cv2.VideoCapture(0)
@@ -22,39 +21,41 @@ def initCapture():
     while True:
 
         frame = cv2.flip(window.read()[1], 1)
-        keyPressed = cv2.waitKey(1)
+        key = cv2.waitKey(1)
 
-        if keyPressed == ord("c"):
-            hist = getHist(frame)
-            calibrated = True
-        elif keyPressed == ord("m"):
-            mouseAction = True
-        elif keyPressed == ord("s"):
-            mouseAction = False
-        elif keyPressed == ord("q"):
-            window.release()
+        if pressed(key, "x"):
             cv2.destroyAllWindows()
             break
+        elif pressed(key, "c"):
+            hist = getHist(frame)
+            calibrated = True
+        elif pressed(key, "m"):
+            mouseAction = True
+        elif pressed(key, "s"):
+            mouseAction = False
 
         if calibrated:
             run(mouseAction, hist, frame)
-
         else:
             drawSamplingRect(frame)
 
         cv2.imshow("Window", frame)
 
 
+def pressed(key, expected):
+    return key == ord(expected)
+
+
 def run(action, hist, frame):
-    histMask = getHistMask(frame, hist)
-    cv2.imshow("Mask", histMask)
-    coordinates = getCoordinates(histMask)
+    mask = getMask(frame, hist)
+    cv2.imshow("Mask", mask)
+    coordinates = getCoordinates(mask)
     if coordinates is not None:
         execAction(coordinates, frame.shape, action)
 
 
-def getCoordinates(histMask):
-    largestCnt = getLargestCnt(histMask)
+def getCoordinates(mask):
+    largestCnt = getLargestCnt(mask)
     if largestCnt is None:
         return None
 
@@ -64,12 +65,22 @@ def getCoordinates(histMask):
 
 def execAction(coordinates, shape, mouseAction):
     if mouseAction:
-        col, row = coordinates[0], coordinates[1]
-        pyautogui.moveTo(col * screenCols / shape[1], row * screenRows / shape[0])
+        moveMouse(coordinates, shape)
     else:
-        if len(motionPath) >= 2:
-            distance = motionPath[-1][1] - motionPath[-2][1]
-            pyautogui.scroll(-distance / 2)
+        scroll()
+
+
+def moveMouse(coordinates, shape):
+    screenCols, screenRows = pyautogui.size()
+    col, row = coordinates[0], coordinates[1]
+    pyautogui.moveTo(col * screenCols / shape[1], row * screenRows / shape[0])
+
+
+def scroll():
+    if len(motionPath) <= 1:
+        return
+    distance = motionPath[-1][1] - motionPath[-2][1]
+    pyautogui.scroll(-distance / 2)
 
 
 def drawSamplingRect(frame):
@@ -115,7 +126,7 @@ def getHist(frame):
     return cv2.normalize(hist, hist, 0, L - 1, cv2.NORM_MINMAX)
 
 
-def getHistMask(frame, hist):
+def getMask(frame, hist):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, HUE_MAX, 0, L], 1)
 
@@ -132,4 +143,4 @@ def getHistMask(frame, hist):
 
 
 if __name__ == "__main__":
-    initCapture()
+    main()
