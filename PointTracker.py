@@ -3,78 +3,72 @@ import numpy as np
 import cv2
 
 HUE_MAX = 180
-Y_START = 20
-X_START = 20
+L = 256
+ROWS_LEN = 20
+COLS_LEN = 20
 ROW_START = 0.5
 COL_START = 0.8
-L = 256
 mouseMode = True
 histExists = False
-screenSizeX, screenSizeY = pyautogui.size()
+screenCols, screenRows = pyautogui.size()
 pyautogui.PAUSE = 0
 pyautogui.FAILSAFE = False
 traversePoints = []
 
 
-def createHistogram(frame):
+def getHist(frame):
     rows, cols, _ = frame.shape
     hsvFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    roi = np.zeros([Y_START, X_START, 3], dtype=hsvFrame.dtype)
+    roi = np.zeros([ROWS_LEN, COLS_LEN, 3], dtype=hsvFrame.dtype)
 
-    y0, x0 = int(ROW_START * rows), int(COL_START * cols)
-    roi = hsvFrame[y0 : y0 + Y_START, x0 : x0 + X_START, :]
+    irow, icol = int(ROW_START * rows), int(COL_START * cols)
+    roi = hsvFrame[irow : irow + ROWS_LEN, icol : icol + COLS_LEN, :]
 
     hist = cv2.calcHist([roi], [0, 1], None, [HUE_MAX, L], [0, HUE_MAX, 0, L])
     return cv2.normalize(hist, hist, 0, L - 1, cv2.NORM_MINMAX)
 
 
 def drawLocker(frame):
-    rows, cols, _ = frame.shape
-
-    y0, x0 = int(ROW_START * rows), int(COL_START * cols)
-    cv2.rectangle(frame, (x0, y0), (x0 + X_START, y0 + Y_START), (0, L - 1, 0), 1)
+    rows, cols = frame.shape[0], frame.shape[1]
+    irow, icol = int(ROW_START * rows), int(COL_START * cols)
+    cv2.rectangle(frame, (icol, irow), (icol + COLS_LEN, irow + ROWS_LEN), (0, L - 1, 0), 1)
 
 
 def detect(frame, hist):
-    # global traversePoints
-    histMask = histMasking(frame, hist)
+    histMask = getHistMask(frame, hist)
     cv2.imshow("histMask", histMask)
-    contours = getContours(histMask)
-    maxContour = getMaxContours(contours)
+    largestContour = getLargestContour(histMask)
+    if largestContour is None:
+        return
 
-    centroid = getCentroid(maxContour)
+    centroid = getCentroid(largestContour)
     cv2.circle(frame, centroid, 5, [L - 1, 0, 0], -1)
+    farthestPoint = largestContour[largestContour[:, :, 1].argmin()][0]
+    if len(traversePoints) > 0:
+        if abs(farthestPoint[0] - traversePoints[-1][0]) < 10:
+            farthestPoint[0] = traversePoints[-1][0]
+        if abs(farthestPoint[1] - traversePoints[-1][1]) < 10:
+            farthestPoint[1] = traversePoints[-1][1]
+    farthestPoint = tuple(farthestPoint)
 
-    if maxContour is not None:
-        farthestPoint = maxContour[maxContour[:, :, 1].argmin()][0]
-        if farthestPoint is not None:
-            # Reduce noise in farthestPoint
-            if len(traversePoints) > 0:
-                if abs(farthestPoint[0] - traversePoints[-1][0]) < 10:
-                    farthestPoint[0] = traversePoints[-1][0]
-                if abs(farthestPoint[1] - traversePoints[-1][1]) < 10:
-                    farthestPoint[1] = traversePoints[-1][1]
-            farthestPoint = tuple(farthestPoint)
+    cv2.circle(frame, farthestPoint, 5, [0, 0, L - 1], -1)
 
-            cv2.circle(frame, farthestPoint, 5, [0, 0, L - 1], -1)
+    if len(traversePoints) < 10:
+        traversePoints.append(farthestPoint)
+    else:
+        traversePoints.pop(0)
+        traversePoints.append(farthestPoint)
 
-            if len(traversePoints) < 10:
-                traversePoints.append(farthestPoint)
-            else:
-                traversePoints.pop(0)
-                traversePoints.append(farthestPoint)
-
-        drawPath(frame, traversePoints)
-        execute(farthestPoint, frame)
+    drawPath(frame, traversePoints)
+    execute(farthestPoint, frame)
 
 
 def execute(farthestPoint, frame):
-    global mouseMode, screenSizeX, screenSizeY
     if mouseMode:
         targetX = farthestPoint[0]
         targetY = farthestPoint[1]
         pyautogui.moveTo(
-            targetX * screenSizeX / frame.shape[1], targetY * screenSizeY / frame.shape[0]
+            targetX * screenCols / frame.shape[1], targetY * screenRows / frame.shape[0]
         )
     else:
         if len(traversePoints) >= 2:
@@ -88,7 +82,7 @@ def drawPath(frame, traversePoints):
         cv2.line(frame, traversePoints[i - 1], traversePoints[i], [0, 0, L - 1], thickness)
 
 
-def histMasking(frame, hist):
+def getHistMask(frame, hist):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, HUE_MAX, 0, L], 1)
 
@@ -98,11 +92,10 @@ def histMasking(frame, hist):
     ret, thresh = cv2.threshold(dst, 150, L - 1, cv2.THRESH_BINARY)
 
     kernel = np.ones((5, 5), np.uint8)
-    # thresh = cv2.dilate(thresh, kernel, iterations=5)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=5)
 
-    thresh = cv2.merge((thresh, thresh, thresh))
-    return cv2.bitwise_and(frame, thresh)
+    merged = cv2.merge((thresh, thresh, thresh))
+    return cv2.bitwise_and(frame, merged)
 
 
 def getCentroid(contour):
@@ -115,40 +108,27 @@ def getCentroid(contour):
         return None
 
 
-def getMaxContours(contours):
-    if len(contours) > 0:
-        maxIndex = 0
-        maxArea = 0
-
-        for i in range(len(contours)):
-            cnt = contours[i]
-            area = cv2.contourArea(cnt)
-
-            if area > maxArea:
-                maxArea = area
-                maxIndex = i
-        return contours[maxIndex]
-
-
-def getContours(histMask):
+def getLargestContour(histMask):
     grayHistMask = cv2.cvtColor(histMask, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(grayHistMask, 0, L - 1, 0)
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    return contours
+    thresh = cv2.threshold(grayHistMask, 0, L - 1, 0)[1]
+    contours = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
+    if len(contours) == 0:
+        return None
+    return max(contours, key=cv2.contourArea)
 
 
 def initCapture():
     global mouseMode, histExists
-    cap = cv2.VideoCapture(0)
+    capture = cv2.VideoCapture(0)
 
-    while cap.isOpened():
-        ret, frame = cap.read()
+    while capture.isOpened():
+        frame = capture.read()[1]
         frame = cv2.flip(frame, 1)
         k = cv2.waitKey(1) & 0xFF
 
         if k == ord("z"):
             histExists = True
-            hist = createHistogram(frame)
+            hist = getHist(frame)
         elif k == ord("m"):
             mouseMode = True
         elif k == ord("n"):
@@ -162,7 +142,7 @@ def initCapture():
 
         cv2.imshow("Output", frame)
 
-    cap.release()
+    capture.release()
     cv2.destroyAllWindows()
 
 
