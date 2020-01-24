@@ -45,23 +45,23 @@ def detect(frame, hist):
         return
 
     farthestPoint = largestContour[largestContour[:, :, 1].argmin()][0]
+    farthestPoint = reduceNoise(farthestPoint)
+
+    execute(farthestPoint, frame)
+
+
+def reduceNoise(farthestPoint):
     if len(traversePoints) > 0:
         if abs(farthestPoint[0] - traversePoints[-1][0]) < 10:
             farthestPoint[0] = traversePoints[-1][0]
         if abs(farthestPoint[1] - traversePoints[-1][1]) < 10:
             farthestPoint[1] = traversePoints[-1][1]
-    farthestPoint = tuple(farthestPoint)
-
-    cv2.circle(frame, farthestPoint, 5, [0, 0, L - 1], -1)
-
     if len(traversePoints) < 10:
         traversePoints.append(farthestPoint)
     else:
         traversePoints.pop(0)
         traversePoints.append(farthestPoint)
-
-    drawPath(frame, traversePoints)
-    execute(farthestPoint, frame)
+    return farthestPoint
 
 
 def execute(farthestPoint, frame):
@@ -75,12 +75,6 @@ def execute(farthestPoint, frame):
         if len(traversePoints) >= 2:
             movedDistance = traversePoints[-1][1] - traversePoints[-2][1]
             pyautogui.scroll(-movedDistance / 2)
-
-
-def drawPath(frame, traversePoints):
-    for i in range(1, len(traversePoints)):
-        thickness = int((i + 1) / 2)
-        cv2.line(frame, traversePoints[i - 1], traversePoints[i], [0, 0, L - 1], thickness)
 
 
 def getHistMask(frame, hist):
