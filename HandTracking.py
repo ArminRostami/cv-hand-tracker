@@ -12,34 +12,44 @@ motionPath = []
 
 
 def main():
-    pyautogui.PAUSE = 0
-    pyautogui.FAILSAFE = False
+    pyautogui.PAUSE = 0  # seconds to pause after function calls
+    pyautogui.FAILSAFE = False  # allows the mouse to exit the window
     calibrated = False
     mouseAction = True
     window = cv2.VideoCapture(0)
-
+    print(
+        """press:
+        (C) to calibrate (move your hand to the green rectangle)
+        (S) to switch to scroll mode
+        (M) to switch to scroll mode
+        (X) to exit\n"""
+    )
     while True:
 
-        frame = cv2.flip(window.read()[1], 1)
+        frame = cv2.flip(window.read()[1], 1)  # flip the image because it is mirrored in webcam
         key = cv2.waitKey(1)
 
         if pressed(key, "x"):
+            print("X pressed. exiting...")
             cv2.destroyAllWindows()
             break
         elif pressed(key, "c"):
             hist = getHist(frame)
             calibrated = True
+            print("Calibration complete. Moving mouse with hand motions...")
         elif pressed(key, "m"):
             mouseAction = True
+            print("Switched to mouse mode.")
         elif pressed(key, "s"):
             mouseAction = False
+            print("Switched to scroll mode.")
 
         if calibrated:
+            cv2.destroyWindow("Window")
             run(mouseAction, hist, frame)
         else:
             drawSamplingRect(frame)
-
-        cv2.imshow("Window", frame)
+            cv2.imshow("Window", frame)
 
 
 def pressed(key, expected):
@@ -51,7 +61,7 @@ def run(action, hist, frame):
     cv2.imshow("Mask", mask)
     coordinates = getCoordinates(mask)
     if coordinates is not None:
-        execAction(coordinates, frame.shape, action)
+        doAction(coordinates, frame.shape, action)
 
 
 def getCoordinates(mask):
@@ -63,7 +73,7 @@ def getCoordinates(mask):
     return reduceNoise(coordinates)
 
 
-def execAction(coordinates, shape, mouseAction):
+def doAction(coordinates, shape, mouseAction):
     if mouseAction:
         moveMouse(coordinates, shape)
     else:
@@ -99,18 +109,25 @@ def getLargestCnt(mask):
 
 
 def reduceNoise(coordinates):
-    TOLERANCE = 10
+    tolerance = 10
     if len(motionPath) > 0:
-        if abs(coordinates[0] - motionPath[-1][0]) < TOLERANCE:
-            coordinates[0] = motionPath[-1][0]
-        if abs(coordinates[1] - motionPath[-1][1]) < TOLERANCE:
-            coordinates[1] = motionPath[-1][1]
-    if len(motionPath) < 10:
+        lastPoint = motionPath[-1]
+        lastCol, lastRow = lastPoint[0], lastPoint[1]
+        if abs(coordinates[0] - lastCol) < tolerance:
+            coordinates[0] = lastCol
+        if abs(coordinates[1] - lastRow) < tolerance:
+            coordinates[1] = lastRow
+    addToPath(coordinates)
+    return coordinates
+
+
+def addToPath(coordinates):
+    maxSize = 2
+    if len(motionPath) < maxSize:
         motionPath.append(coordinates)
     else:
         motionPath.pop(0)
         motionPath.append(coordinates)
-    return coordinates
 
 
 def getHist(frame):
