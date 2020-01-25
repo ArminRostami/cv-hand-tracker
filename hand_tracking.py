@@ -1,4 +1,4 @@
-import pyautogui
+from actions import moveMouse, scroll
 import numpy as np
 import cv2
 
@@ -12,8 +12,7 @@ motionPath = []
 
 
 def main():
-    pyautogui.PAUSE = 0  # seconds to pause after function calls
-    pyautogui.FAILSAFE = False  # allows the mouse to exit the window
+
     calibrated = False
     mouseAction = True
     window = cv2.VideoCapture(0)
@@ -21,7 +20,7 @@ def main():
         """press:
         (C) to calibrate (move your hand to the green rectangle)
         (S) to switch to scroll mode
-        (M) to switch to scroll mode
+        (M) to switch to mouse mode
         (X) to exit\n"""
     )
     while True:
@@ -77,20 +76,7 @@ def doAction(coordinates, shape, mouseAction):
     if mouseAction:
         moveMouse(coordinates, shape)
     else:
-        scroll()
-
-
-def moveMouse(coordinates, shape):
-    screenCols, screenRows = pyautogui.size()
-    col, row = coordinates[0], coordinates[1]
-    pyautogui.moveTo(col * screenCols / shape[1], row * screenRows / shape[0])
-
-
-def scroll():
-    if len(motionPath) <= 1:
-        return
-    distance = motionPath[-1][1] - motionPath[-2][1]
-    pyautogui.scroll(-distance / 2)
+        scroll(motionPath)
 
 
 def drawSamplingRect(frame):
