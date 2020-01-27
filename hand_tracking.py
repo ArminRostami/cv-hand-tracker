@@ -18,7 +18,7 @@ def main():
     window = cv2.VideoCapture(0)
     print(
         """press:
-        (C) to calibrate (move your hand to the green rectangle)
+        (C) to calibrate (move your hand to the blue rectangle)
         (S) to switch to scroll mode
         (M) to switch to mouse mode
         (X) to exit\n"""
@@ -82,7 +82,9 @@ def doAction(coordinates, shape, mouseAction):
 def drawSamplingRect(frame):
     rows, cols = frame.shape[0], frame.shape[1]
     irow, icol = int(ROW_START * rows), int(COL_START * cols)
-    cv2.rectangle(frame, (icol, irow), (icol + COLS_LEN, irow + ROWS_LEN), (0, L - 1, 0), 1)
+    blue = (255, 0, 0)
+    thickness = 3
+    cv2.rectangle(frame, (icol, irow), (icol + COLS_LEN, irow + ROWS_LEN), blue, thickness)
 
 
 def getLargestCnt(mask):
