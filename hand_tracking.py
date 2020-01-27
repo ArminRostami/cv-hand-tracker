@@ -60,6 +60,7 @@ def run(action, hist, frame):
     cv2.imshow("Mask", mask)
     coordinates = getCoordinates(mask)
     if coordinates is not None:
+        addToPath(coordinates)
         doAction(coordinates, frame.shape, action)
 
 
@@ -105,7 +106,6 @@ def reduceNoise(coordinates):
             coordinates[0] = lastCol
         if abs(coordinates[1] - lastRow) < tolerance:
             coordinates[1] = lastRow
-    addToPath(coordinates)
     return coordinates
 
 
