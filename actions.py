@@ -4,7 +4,7 @@ pyautogui.PAUSE = 0  # seconds to pause after function calls
 pyautogui.FAILSAFE = False  # allows the mouse to exit the window
 
 
-def moveMouse(coordinates, shape):
+def move_mouse(coordinates, shape):
     screenCols, screenRows = pyautogui.size()
     col, row = coordinates[0], coordinates[1]
     pyautogui.moveTo(col * screenCols / shape[1], row * screenRows / shape[0])

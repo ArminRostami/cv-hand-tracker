@@ -1,4 +1,4 @@
-from actions import moveMouse, scroll
+from actions import move_mouse, scroll
 import numpy as np
 import cv2
 
@@ -33,7 +33,7 @@ def main():
             cv2.destroyAllWindows()
             break
         elif pressed(key, "c"):
-            hist = getHist(frame)
+            hist = get_histogram(frame)
             calibrated = True
             print("Calibration complete. Moving mouse with hand motions...")
         elif pressed(key, "m"):
@@ -47,7 +47,7 @@ def main():
             cv2.destroyWindow("Window")
             run(mouseAction, hist, frame)
         else:
-            drawSamplingRect(frame)
+            draw_sampling_rectangle(frame)
             cv2.imshow("Window", frame)
 
 
@@ -56,31 +56,31 @@ def pressed(key, expected):
 
 
 def run(action, hist, frame):
-    mask = getMask(frame, hist)
+    mask = get_mask(frame, hist)
     cv2.imshow("Mask", mask)
-    coordinates = getCoordinates(mask)
+    coordinates = get_coordinates(mask)
     if coordinates is not None:
-        addToPath(coordinates)
-        doAction(coordinates, frame.shape, action)
+        add_to_path(coordinates)
+        perform_action(coordinates, frame.shape, action)
 
 
-def getCoordinates(mask):
-    largestCnt = getLargestCnt(mask)
+def get_coordinates(mask):
+    largestCnt = get_largest_cnt(mask)
     if largestCnt is None:
         return None
 
     coordinates = largestCnt[largestCnt[:, :, 1].argmin()][0]
-    return reduceNoise(coordinates)
+    return reduce_noise(coordinates)
 
 
-def doAction(coordinates, shape, mouseAction):
+def perform_action(coordinates, shape, mouseAction):
     if mouseAction:
-        moveMouse(coordinates, shape)
+        move_mouse(coordinates, shape)
     else:
         scroll(motionPath)
 
 
-def drawSamplingRect(frame):
+def draw_sampling_rectangle(frame):
     rows, cols = frame.shape[0], frame.shape[1]
     irow, icol = int(ROW_START * rows), int(COL_START * cols)
     blue = (255, 0, 0)
@@ -88,7 +88,7 @@ def drawSamplingRect(frame):
     cv2.rectangle(frame, (icol, irow), (icol + COLS_LEN, irow + ROWS_LEN), blue, thickness)
 
 
-def getLargestCnt(mask):
+def get_largest_cnt(mask):
     gray_Mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
     thresh = cv2.threshold(gray_Mask, 0, L - 1, 0)[1]
     contours = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
@@ -97,7 +97,7 @@ def getLargestCnt(mask):
     return max(contours, key=cv2.contourArea)
 
 
-def reduceNoise(coordinates):
+def reduce_noise(coordinates):
     tolerance = 10
     if len(motionPath) > 0:
         lastPoint = motionPath[-1]
@@ -109,7 +109,7 @@ def reduceNoise(coordinates):
     return coordinates
 
 
-def addToPath(coordinates):
+def add_to_path(coordinates):
     maxSize = 2
     if len(motionPath) < maxSize:
         motionPath.append(coordinates)
@@ -118,7 +118,7 @@ def addToPath(coordinates):
         motionPath.append(coordinates)
 
 
-def getHist(frame):
+def get_histogram(frame):
     rows, cols = frame.shape[0], frame.shape[1]
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     roi = np.zeros([ROWS_LEN, COLS_LEN, 3], dtype=hsv.dtype)
@@ -131,7 +131,7 @@ def getHist(frame):
     return cv2.normalize(hist, hist, 0, L - 1, cv2.NORM_MINMAX)
 
 
-def getMask(frame, hist):
+def get_mask(frame, hist):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, HUE_MAX, 0, L], 1)
 
