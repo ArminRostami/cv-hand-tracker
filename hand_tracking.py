@@ -102,20 +102,16 @@ def reduce_noise(coordinates):
     if len(motionPath) > 0:
         lastPoint = motionPath[-1]
         lastCol, lastRow = lastPoint[0], lastPoint[1]
-        if abs(coordinates[0] - lastCol) < tolerance:
-            coordinates[0] = lastCol
-        if abs(coordinates[1] - lastRow) < tolerance:
-            coordinates[1] = lastRow
+        coordinates[0] = lastCol if abs(coordinates[0] - lastCol) < tolerance else coordinates[0]
+        coordinates[1] = lastRow if abs(coordinates[1] - lastRow) < tolerance else coordinates[1]
     return coordinates
 
 
 def add_to_path(coordinates):
     maxSize = 2
-    if len(motionPath) < maxSize:
-        motionPath.append(coordinates)
-    else:
+    if len(motionPath) >= maxSize:
         motionPath.pop(0)
-        motionPath.append(coordinates)
+    motionPath.append(coordinates)
 
 
 def get_histogram(frame):
