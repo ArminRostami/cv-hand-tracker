@@ -68,8 +68,7 @@ def get_coordinates(mask):
     largestCnt = get_largest_cnt(mask)
     if largestCnt is None:
         return None
-
-    coordinates = largestCnt[largestCnt[:, :, 1].argmin()][0]
+    coordinates = largestCnt[0][0]
     return reduce_noise(coordinates)
 
 
@@ -117,30 +116,35 @@ def add_to_path(coordinates):
 def get_histogram(frame):
     rows, cols = frame.shape[0], frame.shape[1]
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    roi = np.zeros([ROWS_LEN, COLS_LEN, 3], dtype=hsv.dtype)
 
     irow = int(ROW_START * rows)
     icol = int(COL_START * cols)
-    roi = hsv[irow : irow + ROWS_LEN, icol : icol + COLS_LEN, :]
+    hsv = hsv[irow : irow + ROWS_LEN, icol : icol + COLS_LEN, :]
 
-    hist = cv2.calcHist([roi], [0, 1], None, [HUE_MAX, L], [0, HUE_MAX, 0, L])
+    hist = cv2.calcHist(
+        [hsv], channels=[0, 1], mask=None, histSize=[HUE_MAX, L], ranges=[0, HUE_MAX, 0, L]
+    )
     return cv2.normalize(hist, hist, 0, L - 1, cv2.NORM_MINMAX)
 
 
 def get_mask(frame, hist):
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, HUE_MAX, 0, L], 1)
+    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-    disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
-    dst = cv2.filter2D(dst, -1, disc)
+    proj = cv2.calcBackProject(
+        [hsv_frame], channels=[0, 1], hist=hist, ranges=[0, HUE_MAX, 0, L], scale=1
+    )
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (29, 29))
+    proj = cv2.filter2D(proj, -1, kernel)
 
-    thresh = cv2.threshold(dst, 150, L - 1, cv2.THRESH_BINARY)[1]
+    proj = cv2.threshold(proj, 150, L - 1, cv2.THRESH_BINARY)[1]
 
     kernel = np.ones((5, 5), np.uint8)
-    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=5)
+    proj = cv2.morphologyEx(proj, cv2.MORPH_CLOSE, kernel, iterations=5)
 
-    merged = cv2.merge((thresh, thresh, thresh))
-    return cv2.bitwise_and(frame, merged)
+    proj_3d = cv2.merge((proj, proj, proj))
+    mask = cv2.bitwise_and(frame, proj_3d)
+
+    return mask
 
 
 if __name__ == "__main__":
