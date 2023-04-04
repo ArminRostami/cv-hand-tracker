@@ -14,4 +14,4 @@ def scroll(path):
     if len(path) <= 1:
         return
     distance = path[-1][1] - path[-2][1]
-    pyautogui.scroll(-distance / 2)
+    pyautogui.scroll(-distance / 4)
